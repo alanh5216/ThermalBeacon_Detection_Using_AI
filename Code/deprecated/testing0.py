@@ -24,7 +24,7 @@ def main():
 
     while True:
         ret, frame = cap.read()
-        
+
         if not ret or frame is None:
             continue
             
@@ -46,7 +46,7 @@ def main():
 
             # Resize the 256x192 image so it's actually large enough to see on your monitor
             # INTER_NEAREST keeps the pixels sharp instead of blurring them together
-            display_frame = cv2.resize(thermal_color_mapped, (768, 576), interpolation=cv2.INTER_NEAREST)
+            display_frame = cv2.resize(clean_frame, (768, 576), interpolation=cv2.INTER_NEAREST)
 
             cv2.imshow("Topdon TC001 - Windows DirectShow", display_frame)
             
