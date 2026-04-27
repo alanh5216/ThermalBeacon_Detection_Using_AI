@@ -3,33 +3,28 @@ void setup() {
   // Notice: No Serial.begin() needed unless you want to print outside the fast loops!
 }
 
-// Helper function to transmit a binary '1' for exactly 700ms
+// Helper function to transmit a binary '1' for exactly 800ms
 void transmitOne() {
   
   // Phase 1: THE SPIKE (100% ON for 100ms)
   digitalWrite(PIN_A0, HIGH);
   delay(100); 
 
-  // Phase 2: THE HOLD (90% Duty Cycle for 590ms)
-  // 590ms total time / 10ms period = exactly 59 cycles
-  for (int i = 0; i < 58; i++) {
+  // Phase 2: THE HOLD (85% Duty Cycle for 700ms)
+  // 700ms total time / 10ms period = exactly 70 cycles
+  for (int i = 0; i < 69; i++) {
     digitalWrite(PIN_A0, LOW);
-    delayMicroseconds(1000);  // 1ms OFF
+    delayMicroseconds(1500);  // 1.5ms OFF
 
     digitalWrite(PIN_A0, HIGH);
-    delayMicroseconds(9000);  // 9ms ON
+    delayMicroseconds(8500);  // 8.5ms ON
   }
-  // Phase 3: THE PRE COOL (OFF for 10ms)
-  // If the next bit is a 0 then this gives it more time to cool,
-  // If the next bit is a 1 then this lets it cool down so the spike doesn't overheat it
-  digitalWrite(PIN_A0, LOW);
-  delayMicroseconds(10000);  // 10ms OFF
 }
 
-// Helper function to transmit a binary '0' for exactly 700ms
+// Helper function to transmit a binary '0' for exactly 800ms
 void transmitZero() {
   digitalWrite(PIN_A0, LOW);
-  delay(700); // Completely OFF for 700ms to let it cool
+  delay(800); // Completely OFF for 800ms to let it cool
 }
 
 void loop() {

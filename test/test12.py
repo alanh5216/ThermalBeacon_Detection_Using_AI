@@ -14,20 +14,20 @@ class BeaconDecoder:
         self.state = "IDLE"        # "IDLE" (seeking preamble) or "READING" (seeking ID)
         self.decoded_id = None     # The final confirmed Beacon ID
         
-        self.bit_duration = 0.7    # 500ms per bit (matches your Arduino)
+        self.bit_duration = 0.8    # 800ms per bit (matches your Arduino)
         self.threshold = 47      # Temps above this are a 1, below are a 0
 
     def add_reading(self, current_time, temp):
         self.history.append((current_time, temp))
 
-        # Check if 500ms has passed since the oldest frame in our buffer
+        # Check if 800ms has passed since the oldest frame in our buffer
         oldest_time = self.history[0][0]
         if current_time - oldest_time >= self.bit_duration:
             
-            # 1. Average the temperatures over the last 500ms to filter out noise
+            # 1. Average the temperatures over the last 800ms to filter out noise
             avg_temp = sum(t for _, t in self.history) / len(self.history)
             
-            # 2. Reset the buffer for the next 500ms window
+            # 2. Reset the buffer for the next 800ms window
             self.history = [(current_time, temp)] 
 
             # 3. Threshold the average into a binary bit
