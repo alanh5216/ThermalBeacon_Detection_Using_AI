@@ -12,7 +12,7 @@ void transmitOne() {
 
   // Phase 2: THE HOLD (90% Duty Cycle for the remaining 400ms)
   // 400ms total time / 10ms period = exactly 40 cycles
-  for (int i = 0; i < 40; i++) {
+  for (int i = 0; i < 50; i++) {
     digitalWrite(PIN_A0, HIGH);
     delayMicroseconds(9000);  // 9ms ON
     
@@ -24,7 +24,7 @@ void transmitOne() {
 // Helper function to transmit a binary '0' for exactly 500ms
 void transmitZero() {
   digitalWrite(PIN_A0, LOW);
-  delay(500); // Completely OFF for 500ms to let it cool
+  delay(600); // Completely OFF for 500ms to let it cool
 }
 
 void loop() {

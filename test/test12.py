@@ -14,7 +14,7 @@ class BeaconDecoder:
         self.state = "IDLE"        # "IDLE" (seeking preamble) or "READING" (seeking ID)
         self.decoded_id = None     # The final confirmed Beacon ID
         
-        self.bit_duration = 0.5    # 500ms per bit (matches your Arduino)
+        self.bit_duration = 0.6    # 500ms per bit (matches your Arduino)
         self.threshold = 42.5      # Temps above this are a 1, below are a 0
 
     def add_reading(self, current_time, temp):
