@@ -40,4 +40,5 @@ void loop() {
   transmitZero();
   transmitOne();
   transmitZero();
+  transmitOne();
 }
