@@ -17,32 +17,24 @@ class BeaconDecoder:
         self.bit_duration = 0.8    # 800ms per bit (matches your Arduino)
         self.threshold = 47      # Temps above this are a 1, below are a 0
 
-def add_reading(self, current_time, temp):
+    def add_reading(self, current_time, temp):
         self.history.append((current_time, temp))
 
+        # Check if 800ms has passed since the oldest frame in our buffer
         oldest_time = self.history[0][0]
         if current_time - oldest_time >= self.bit_duration:
             
-            # --- THE FIX: The Back-Half Average ---
-            # Find the halfway point of this bit window
-            halfway_mark = oldest_time + (self.bit_duration / 2.0)
+            # 1. Average the temperatures over the last 800ms to filter out noise
+            avg_temp = sum(t for _, t in self.history) / len(self.history)
             
-            # Only grab the temperatures from the second half of the window
-            back_half_temps = [t for stamp, t in self.history if stamp >= halfway_mark]
-            
-            # Safety check in case frames dropped
-            if len(back_half_temps) > 0:
-                avg_temp = sum(back_half_temps) / len(back_half_temps)
-            else:
-                avg_temp = self.history[-1][1] 
-            
-            # Reset the buffer for the next 800ms window
+            # 2. Reset the buffer for the next 800ms window
             self.history = [(current_time, temp)] 
 
-            # Threshold the new smart average into a binary bit
+            # 3. Threshold the average into a binary bit
             bit = 1 if avg_temp > self.threshold else 0
             self.bit_stream.append(bit)
 
+            # 4. Run the State Machine
             self._process_state_machine()
 
     def _process_state_machine(self):
