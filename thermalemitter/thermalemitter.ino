@@ -10,21 +10,21 @@ void transmitOne() {
   digitalWrite(PIN_A0, HIGH);
   delay(100); 
 
-  // Phase 2: THE HOLD (90% Duty Cycle for the remaining 400ms)
+  // Phase 2: THE HOLD (80% Duty Cycle for the remaining 400ms)
   // 400ms total time / 10ms period = exactly 40 cycles
-  for (int i = 0; i < 50; i++) {
-    digitalWrite(PIN_A0, HIGH);
-    delayMicroseconds(9000);  // 9ms ON
-    
+  for (int i = 0; i < 60; i++) {
     digitalWrite(PIN_A0, LOW);
-    delayMicroseconds(1000);  // 1ms OFF
+    delayMicroseconds(2000);  // 2ms OFF
+
+    digitalWrite(PIN_A0, HIGH);
+    delayMicroseconds(8000);  // 8ms ON
   }
 }
 
 // Helper function to transmit a binary '0' for exactly 500ms
 void transmitZero() {
   digitalWrite(PIN_A0, LOW);
-  delay(600); // Completely OFF for 500ms to let it cool
+  delay(700); // Completely OFF for 500ms to let it cool
 }
 
 void loop() {
