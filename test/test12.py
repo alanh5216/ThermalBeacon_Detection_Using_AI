@@ -70,7 +70,7 @@ class BeaconDecoder:
                     else:
                         print("[ERROR] Reserved ID detected. Dropping packet.")
                 else:
-                    print("[ERROR] Parity mismatch. False sync. Dropping packet.")
+                    print(f"[ERROR] Parity mismatch. False sync. Dropping packet. {id_bits}")
                 
                 # Reset back to IDLE to wait for the next looped transmission
                 self.state = "IDLE"
