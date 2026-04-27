@@ -31,5 +31,13 @@ void loop() {
   // Transmit a 1, then transmit a 0, repeating forever.
   // This gives a ~1Hz square wave
   transmitOne();
+  transmitOne();
+  transmitOne();
+  transmitZero();
+  transmitOne();
+
+  transmitZero();
+  transmitZero();
+  transmitOne();
   transmitZero();
 }
