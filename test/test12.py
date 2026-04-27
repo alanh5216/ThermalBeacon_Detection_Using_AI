@@ -15,7 +15,7 @@ class BeaconDecoder:
         self.decoded_id = None     # The final confirmed Beacon ID
         
         self.bit_duration = 0.7    # 500ms per bit (matches your Arduino)
-        self.threshold = 44      # Temps above this are a 1, below are a 0
+        self.threshold = 47      # Temps above this are a 1, below are a 0
 
     def add_reading(self, current_time, temp):
         self.history.append((current_time, temp))
