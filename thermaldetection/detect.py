@@ -1,72 +1,168 @@
 import cv2
 import numpy as np
 import math
+import time
 from ultralytics import YOLO
 
 model = YOLO("yolov8n.pt")
+
+BEACON_REGISTRY = {
+    2: "Alan Hinojo",
+    3: "Dr. Faller",
+    4: "John Smith",
+    7: "Jane Doe",
+}
+
+# --- NEW: The State Machine Class ---
+class BeaconDecoder:
+    def __init__(self):
+        self.history = []          # Stores tuples of (timestamp, temp)
+        self.bit_stream = []       # Stores the decoded 0s and 1s
+        self.state = "IDLE"        # "IDLE" (seeking preamble) or "READING" (seeking ID)
+        self.decoded_id = None     # The final confirmed Beacon ID
+        
+        self.bit_duration = 0.8    # 800ms per bit (matches your Arduino)
+        self.threshold = 47      # Temps above this are a 1, below are a 0
+
+    def add_reading(self, current_time, temp):
+        self.history.append((current_time, temp))
+
+        oldest_time = self.history[0][0]
+        if current_time - oldest_time >= self.bit_duration:
+            
+            # --- THE FIX: The Back-Half Average ---
+            # Find the halfway point of this bit window
+            halfway_mark = oldest_time + (self.bit_duration / 2.0)
+            
+            # Only grab the temperatures from the second half of the window
+            back_half_temps = [t for stamp, t in self.history if stamp >= halfway_mark]
+            
+            # Safety check in case frames dropped
+            if len(back_half_temps) > 0:
+                avg_temp = sum(back_half_temps) / len(back_half_temps)
+            else:
+                avg_temp = self.history[-1][1] 
+            
+            # Reset the buffer for the next 800ms window
+            self.history = [(current_time, temp)] 
+
+            # Threshold the new smart average into a binary bit
+            bit = 1 if avg_temp > self.threshold else 0
+            self.bit_stream.append(bit)
+
+            self._process_state_machine()
+
+    def _process_state_machine(self):
+        if self.state == "IDLE":
+            # Keep the stream from getting infinitely long to save memory
+            if len(self.bit_stream) > 5:
+                self.bit_stream.pop(0)
+
+            # Check for our 5-bit Barker Code Preamble
+            if self.bit_stream == [1, 1, 1, 0, 1]:
+                print("\n[+] PREAMBLE FOUND! Locking onto packet...")
+                self.state = "READING"
+                self.bit_stream = [] # Clear the stream to receive the payload
+
+        elif self.state == "READING":
+            # Wait until we have 5 bits (4-bit ID + 1-bit Even Parity)
+            if len(self.bit_stream) == 5:
+                id_bits = self.bit_stream[0:4]
+                parity_bit = self.bit_stream[4]
+
+                # Check Even Parity Safety Net
+                num_ones = sum(id_bits)
+                expected_parity = 1 if num_ones % 2 != 0 else 0
+
+                if parity_bit == expected_parity:
+                    # Convert the 4-bit binary list into an integer ID
+                    beacon_id = int("".join(str(b) for b in id_bits), 2)
+                    
+                    # Check against the reserved forbidden ID (e.g., 14)
+                    if beacon_id != 14:
+                        self.decoded_id = beacon_id
+                        print(f"[SUCCESS] Beacon ID {beacon_id} confirmed!")
+                    else:
+                        print("[ERROR] Reserved ID detected. Dropping packet.")
+                else:
+                    print(f"[ERROR] Parity mismatch. False sync. Dropping packet. {id_bits}")
+                
+                # Reset back to IDLE to wait for the next looped transmission
+                self.state = "IDLE"
+                self.bit_stream = []
+
 
 def main():
     camera_index = 1
     cap = cv2.VideoCapture(camera_index, cv2.CAP_MSMF)
 
-    # 1. Force the standard video resolution
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, 256)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 384)
-    
-    # 2. Force Windows to use the raw YUY2 format
     cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'YUY2'))
-    
-    # 3. Tell OpenCV NOT to try and guess the colors. Just give us the raw bytes.
     cap.set(cv2.CAP_PROP_CONVERT_RGB, 0)
 
     if not cap.isOpened():
         print("Error: Could not open camera.")
         return
     
+    # --- NEW: Dictionary to hold our decoders ---
+    active_trackers = {}
+    
     while True:
         ret, frame = cap.read()
         if not ret or frame is None:
             continue
         try:
+            current_time = time.time()
             reshaped_frame = frame.reshape((392, 256, 2))
-
             temp_data = reshaped_frame[0:192, :, :]
-            
             image_data = reshaped_frame[196:388, :, :]
-
             image_luminance_only = image_data[:,:,0]
 
             display_frame = cv2.resize(image_luminance_only, (768, 576), interpolation=cv2.INTER_NEAREST)
-
             box_corners = get_boundingbox_corners(image_luminance_only)
             
             if box_corners:
                 display_frame = cv2.cvtColor(display_frame, cv2.COLOR_GRAY2BGR)
                 for corners in box_corners:
-                    # Unpack all 5 variables now
                     x1, y1, x2, y2, track_id = corners
                     
-                    # Draw the bounding box
-                    cv2.rectangle(display_frame, (x1 * 3, y1 * 3), (x2 * 3, y2 * 3), (0, 255, 0), 2)
+                    # --- NEW: Fetch or create the state machine for this YOLO ID ---
+                    if track_id not in active_trackers:
+                        active_trackers[track_id] = BeaconDecoder()
                     
-                    # --- NEW: Draw the ID text floating above the box ---
-                    # cv2.putText takes (image, text, coordinates, font, scale, color, thickness)
-                    label = f"ID: {track_id}"
-                    cv2.putText(display_frame, label, (x1 * 3, (y1 * 3) - 10), 
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+                    decoder = active_trackers[track_id]
 
-                    # Calculate and print the temperature associated with that specific ID
+                    # Get max temp and feed it into the decoder
                     max_raw_temp = max_temp_in_box(x1, y1, x2, y2, temp_data)
                     max_celsius_temp = raw_to_celsius_hightemp_mode(max_raw_temp)
-                    print(f"Person ID {track_id}: {max_celsius_temp:.1f} C")
+                    
+                    # Feed the time and temp to our state machine
+                    decoder.add_reading(current_time, max_celsius_temp)
+
+                    # --- NEW: Dynamic Visuals ---
+                    # If we successfully decoded them, turn their box Cyan and show Beacon ID
+                    if decoder.decoded_id is not None:
+                        # Look up the name. If the ID isn't in the registry, call them "Unknown"
+                        target_name = BEACON_REGISTRY.get(decoder.decoded_id, "Unknown")
+                        
+                        box_color = (255, 255, 0) # Cyan in BGR
+                        # Display the Name, the Beacon ID, and the Temperature
+                        label = f"[{target_name}] B_ID:{decoder.decoded_id} ({max_celsius_temp:.1f}C)"
+                    else:
+                        # Otherwise, leave it Green and show the temp and YOLO ID
+                        box_color = (0, 255, 0) # Green in BGR
+                        label = f"Detecting... Y_ID:{track_id} ({max_celsius_temp:.1f}C)"
+
+                    cv2.rectangle(display_frame, (x1 * 3, y1 * 3), (x2 * 3, y2 * 3), box_color, 2)
+                    cv2.putText(display_frame, label, (x1 * 3, (y1 * 3) - 10), 
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.6, box_color, 2)
             
             cv2.imshow("Topdon TC001 - Windows DirectShow", display_frame)
             
         except Exception as e:
-            # If it fails, print the shape so we can see exactly what Windows handed us
             print(f"Error parsing frame. Raw shape was: {frame.shape} | Error: {e}")
         
-        # Wait for the 'q' key to quit
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
 
